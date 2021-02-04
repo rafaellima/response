@@ -26,12 +26,23 @@ def test_slash_command_invalid_signature(client):
 
 
 def test_slash_command_invokes_dialog(post_from_slack_api, mock_slack):
-    data = {"user_id": "U123", "trigger_id": "foo"}
+    data = {"user_id": "U123", "trigger_id": "foo", "channel_id": "incident-report-channel-id"}
     r = post_from_slack_api("slash_command", data)
 
     assert r.status_code == 200
     mock_slack.dialog_open.assert_called_once_with(dialog=ANY, trigger_id="foo")
 
+def test_incident_can_only_be_created_in_official_incident_channel(post_from_slack_api, mock_slack):
+    data = {"user_id": "U123", "trigger_id": "foo", "channel_id": "wrong-incident-channel"}
+    r = post_from_slack_api("slash_command", data)
+
+    assert r.status_code == 200
+    mock_slack.send_ephemeral_message.assert_called_with(
+        "wrong-incident-channel", "U123",
+        f"Looks like you are trying to report an incident in the wrong "
+        f"channel :thinking_face:\n"
+        f"The correct place is <#incident-report-channel-id>"
+    )
 
 @pytest.mark.django_db(transaction=True)
 def test_submit_dialog_creates_incident(post_from_slack_api, mock_slack):
